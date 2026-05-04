@@ -25,7 +25,7 @@ namespace CsAC_Client
                 {
                     webView.CoreWebView2.Settings.AreDefaultContextMenusEnabled = false;
                     webView.CoreWebView2.Settings.IsStatusBarEnabled = false;
-                    webView.CoreWebView2.Settings.AreDevToolsEnabled = false;
+                    webView.CoreWebView2.Settings.AreDevToolsEnabled = true;
                     webView.CoreWebView2.Settings.IsZoomControlEnabled = false;
 
                     webView.CoreWebView2.NewWindowRequested += (s, e) =>
@@ -157,6 +157,7 @@ namespace CsAC_Client
         private void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
         {
             string raw = e.TryGetWebMessageAsString();
+            //System.Windows.MessageBox.Show("收到消息: " + raw, "调试"); // ← 加上这个
             if (string.IsNullOrEmpty(raw)) return;
 
             Dispatcher.Invoke(() =>
