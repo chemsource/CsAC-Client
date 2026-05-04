@@ -157,47 +157,54 @@ namespace CsAC_Client
         private void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
         {
             string raw = e.TryGetWebMessageAsString();
-            //System.Windows.MessageBox.Show("收到消息: " + raw, "调试"); // ← 加上这个
             if (string.IsNullOrEmpty(raw)) return;
+
+            // 简单消息兼容
+            if (raw == "notification_clear") { Dispatcher.Invoke(() => FlashWindowHelper.StopFlash(this)); return; }
+            if (raw == "notification") { Dispatcher.Invoke(() => FlashWindowHelper.Flash(this)); return; }
 
             Dispatcher.Invoke(() =>
             {
-                // 保留原有的简单消息兼容
-                if (raw == "notification_clear")
-                {
-                    FlashWindowHelper.StopFlash(this);
-                    return;
-                }
-                if (raw == "notification")
-                {
-                    FlashWindowHelper.Flash(this);
-                    return;
-                }
-
-                // ✅ 新增：解析结构化 JSON 通知
                 try
                 {
-                    var info = JsonSerializer.Deserialize<NotificationMsg>(raw);
-                    if (info != null && !string.IsNullOrEmpty(info.Text))
+                    // 解析 JSON，对大小写不敏感
+                    var options = new JsonSerializerOptions { PropertyNameCaseInsensitive = true };
+                    var info = JsonSerializer.Deserialize<NotificationMsg>(raw, options);
+
+                    string alertText = info?.Text ?? raw;  // 解析失败则显示原始字符串
+
+                    // 如果窗口隐藏或最小化，先恢复
+                    if (WindowState == WindowState.Minimized || Visibility != Visibility.Visible)
                     {
-                        FlashWindowHelper.Flash(this);
-                        // 气泡提示
-                        notifyIcon.ShowBalloonTip(
-                            5000,
-                            "CsAC 聊天",
-                            info.Text,
-                            System.Windows.Forms.ToolTipIcon.Info);
-                        // 声音
-                        if (info.Type == "at" || info.Type == "reply")
-                            System.Media.SystemSounds.Exclamation.Play();
-                        else
-                            System.Media.SystemSounds.Asterisk.Play();
+                        Show();
+                        WindowState = WindowState.Normal;
+                        Activate();
                     }
+
+                    FlashWindowHelper.Flash(this);
+
+                    notifyIcon.BalloonTipTitle = "CsAC 聊天";
+                    notifyIcon.BalloonTipText = alertText;
+                    notifyIcon.BalloonTipIcon = System.Windows.Forms.ToolTipIcon.Info;
+                    notifyIcon.ShowBalloonTip(5000);
+
+                    //if (info?.Type == "at" || info?.Type == "reply")
+                    //    System.Media.SystemSounds.Exclamation.Play();
+                    //else
+                    //    System.Media.SystemSounds.Asterisk.Play();
                 }
-                catch { /* 解析失败时忽略 */ }
+                catch (Exception ex)
+                {
+                    // 如果发生任何异常，用最原始方式弹出来
+                    notifyIcon.BalloonTipTitle = "CsAC 聊天";
+                    notifyIcon.BalloonTipText = ex.Message;
+                    notifyIcon.BalloonTipIcon = System.Windows.Forms.ToolTipIcon.Warning;
+                    notifyIcon.ShowBalloonTip(5000);
+                }
             });
         }
     }
+
     // 放在 MainWindow 类的最后一个 } 之后，namespace 的最后一个 } 之前
     public class NotificationMsg
     {
