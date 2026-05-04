@@ -10,6 +10,6 @@
         WindowStartupLocation="CenterScreen"
         Icon="icon.ico">
     <Grid>
-        <wv2:WebView2 x:Name="webView" Source="https://cschat.ccccocccc.cc" />
+        <wv2:WebView2 x:Name="webView" />
     </Grid>
 </Window>

@@ -4,6 +4,7 @@ using System.ComponentModel;
 using System.Drawing;
 using System.IO;
 using System.Windows;
+using System.Text.Json;   // ← 新增，用于解析 JSON
 
 namespace CsAC_Client
 {
@@ -155,17 +156,51 @@ namespace CsAC_Client
 
         private void OnWebMessageReceived(object? sender, CoreWebView2WebMessageReceivedEventArgs e)
         {
-            string message = e.TryGetWebMessageAsString();
-            if (!string.IsNullOrEmpty(message))
+            string raw = e.TryGetWebMessageAsString();
+            if (string.IsNullOrEmpty(raw)) return;
+
+            Dispatcher.Invoke(() =>
             {
-                Dispatcher.Invoke(() =>
+                // 保留原有的简单消息兼容
+                if (raw == "notification_clear")
                 {
-                    if (message == "notification")
+                    FlashWindowHelper.StopFlash(this);
+                    return;
+                }
+                if (raw == "notification")
+                {
+                    FlashWindowHelper.Flash(this);
+                    return;
+                }
+
+                // ✅ 新增：解析结构化 JSON 通知
+                try
+                {
+                    var info = JsonSerializer.Deserialize<NotificationMsg>(raw);
+                    if (info != null && !string.IsNullOrEmpty(info.Text))
+                    {
                         FlashWindowHelper.Flash(this);
-                    else if (message == "notification_clear")
-                        FlashWindowHelper.StopFlash(this);
-                });
-            }
+                        // 气泡提示
+                        notifyIcon.ShowBalloonTip(
+                            5000,
+                            "CsAC 聊天",
+                            info.Text,
+                            System.Windows.Forms.ToolTipIcon.Info);
+                        // 声音
+                        if (info.Type == "at" || info.Type == "reply")
+                            System.Media.SystemSounds.Exclamation.Play();
+                        else
+                            System.Media.SystemSounds.Asterisk.Play();
+                    }
+                }
+                catch { /* 解析失败时忽略 */ }
+            });
         }
+    }
+    // 放在 MainWindow 类的最后一个 } 之后，namespace 的最后一个 } 之前
+    public class NotificationMsg
+    {
+        public string Type { get; set; }   // "at", "reply", "new", "notice"
+        public string Text { get; set; }   // 气泡显示的文本
     }
 }
